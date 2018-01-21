@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?><finScript version="1.00" exportedUtcDate="2018-01-21T21:51:18.0000000"><CreatedUserId>ADMIN</CreatedUserId><CreatedUtcDate>2018-01-18T02:26:08.8330000</CreatedUtcDate><UpdatedUserId>ADMIN</UpdatedUserId><UpdatedUtcDate>2018-01-21T21:51:10.0030000</UpdatedUtcDate><ScriptId>FL.DIST</ScriptId><Description>Function Library - Distributions</Description><ScriptType>FunctionLibrary</ScriptType><Active>true</Active><AllowUI>false</AllowUI><Category /><Code>Private Function DistPool ( ByVal PoolId As String, _
+<?xml version="1.0" encoding="utf-8"?><finScript version="1.00" exportedUtcDate="2018-01-21T22:23:47.0000000"><CreatedUserId>ADMIN</CreatedUserId><CreatedUtcDate>2018-01-18T02:26:08.8330000</CreatedUtcDate><UpdatedUserId>ADMIN</UpdatedUserId><UpdatedUtcDate>2018-01-21T22:23:42.2230000</UpdatedUtcDate><ScriptId>FL.DIST</ScriptId><Description>Function Library - Distributions</Description><ScriptType>FunctionLibrary</ScriptType><Active>true</Active><AllowUI>false</AllowUI><Category /><Code>Private Function DistPool ( ByVal PoolId As String, _
                             Optional ByVal Principal As Decimal = 0, _
                             Optional ByVal IncludeUP As Boolean = True, _
                             Optional ByVal Interest As Decimal = 0, _
@@ -56,7 +56,7 @@ dt.Rows.Add(Row)
 
 ' Adding a test line
 Dim TestLine As String
-TestLine = "This is a Test"
+TestLine = "This is a Test, take 2"
 
 row = dt.NewRow
 row("AccountId") = "A"
