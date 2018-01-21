@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="utf-8"?><finScript version="1.00" exportedUtcDate="2018-01-21T20:08:16.0000000"><CreatedUserId>ADMIN</CreatedUserId><CreatedUtcDate>2018-01-18T02:26:08.8330000</CreatedUtcDate><UpdatedUserId>ADMIN</UpdatedUserId><UpdatedUtcDate>2018-01-19T04:07:20.4000000</UpdatedUtcDate><ScriptId>FL.DIST</ScriptId><Description>Function Library - Distributions</Description><ScriptType>FunctionLibrary</ScriptType><Active>true</Active><AllowUI>false</AllowUI><Category /><Code>Private Function DistPool ( ByVal PoolId As String, _
+                            Optional ByVal Principal As Decimal = 0, _
+                            Optional ByVal IncludeUP As Boolean = True, _
+                            Optional ByVal Interest As Decimal = 0, _
+                            Optional ByVal IncludeUI As Boolean = True, _
+                            Optional ByVal LMFRate As Double = 0.00, _
+                            Optional ByVal DateFrom As Date = Nothing, _
+                            Optional ByVal DateTo As Date = Nothing _
+                          ) As DataTable
+
+Dim id As finIncomeDistribution
+Dim idi As finIncomeDistributionItem
+Dim dt As DataTable
+Dim row As DataRow
+Dim FoundRow() As DataRow
+Dim Pool As finPool
+Dim PoolAccount As finPoolAccount
+Dim LMF As Decimal
+Dim AcctPrincipal As Decimal
+Dim AcctInterest As Decimal
+Dim AcctIntRate As Double
+Dim TotalPrincipal As Decimal
+Dim TotalInterest As Decimal
+Dim TotalLMF As Decimal
+Dim VarPrincipal As Decimal
+Dim VarInterest As Decimal
+Dim VarLMF As Decimal
+Dim decTemp As Decimal
+
+finbl.DebugPrint("FL.DIST")
+
+If DateFrom = Nothing Then DateFrom = Now.Date
+If DateTo = Nothing Then DateTo = Now.Date
+
+' Create DataTable
+dt = New DataTable
+dt.Columns.Add("AccountId",GetType(String))
+dt.Columns.Add("Name",GetType(String))
+dt.Columns.Add("Principal",GetType(Decimal))
+dt.Columns.Add("Interest",GetType(Decimal))
+dt.Columns.Add("dPrincipal",GetType(Decimal))
+dt.Columns.Add("dInterest",GetType(Decimal))
+dt.Columns.Add("dLMF",GetType(Decimal))
+dt.Columns.Add(" ",GetType(String))
+
+Pool = finbl.CreatePool
+Pool.Load(PoolId)
+
+row = dt.NewRow
+row("AccountId") = "D"
+row("Name") = "Distribution"
+row("dPrincipal") = Principal
+row("dInterest") = Interest
+row("dLMF") = 0
+dt.Rows.Add(Row)
+
+row = dt.NewRow
+row("AccountId") = "A"
+row("Name") = "Adjustments"
+If IncludeUP Then
+  row("dPrincipal") = Pool.UserData.GetDecimal("UndistributedPrincipal",0)
+End If
+If IncludeUI Then
+  row("dInterest") = Pool.UserData.GetDecimal("UndistributedInterest",0)
+End If
+row("dLMF") = 0
+dt.Rows.Add(Row)
+
+For Each PoolAccount In Pool.Accounts
+  If PoolAccount.AccountClass = isefinAccountClass.Deposit Then
+    poolAccount.Account.GetBalanceAllocations(Nothing,AcctPrincipal, AcctInterest,Nothing,Nothing)
+    row = dt.NewRow
+    row("AccountId") = PoolAccount.AccountId
+    row("Name") = PoolAccount.Name
+    row("Principal") = AcctPrincipal
+    row("Interest") = AcctInterest
+    dt.Rows.Add(Row)
+    TotalPrincipal += AcctPrincipal
+    TotalInterest += AcctInterest
+  ElseIf PoolAccount.AccountClass = isefinAccountClass.LoanFT Then
+    If LMFRate = 0 Then
+      LMFRate = PoolAccount.Account.UserData.GetDouble("LoanManagementFee",0)
+    End If
+    PoolAccount.Account.GetInterestRate(Now.Date,Nothing,AcctIntRate,Nothing,Nothing)
+  End If
+Next
+
+If IncludeUP Then
+  Principal += Pool.UserData.GetDecimal("UndistributedPrincipal",0)
+End If
+finbl.DebugPrint(Principal)
+If Principal &lt;&gt; 0 Then
+  VarPrincipal = Principal
+  For Each Row In dt.Rows
+    decTemp = Math.round(finbl.Database.GetFieldDecimal(row("Principal")) / TotalPrincipal * Principal, 2)
+    Row("dPrincipal") = decTemp
+    varPrincipal -= decTemp
+  Next
+End If
+
+If IncludeUI Then
+  Interest += Pool.UserData.GetDecimal("UndistributedInterest",0)
+End If
+finbl.DebugPrint(Interest)
+If Interest &lt;&gt; 0 Then
+  ' Determine LMF
+  If LMFRate &lt;&gt; 0 And AcctIntRate &lt;&gt; 0 Then
+    LMF = Interest * CDec((LMFRate/AcctIntRate))
+    VarLMF = LMF
+    ' LMF distribution
+    id = finbl.CreateIncomeDistribution
+    id.RangePools = PoolId
+    id.PeriodDateFrom = DateFrom
+    id.PeriodDateTo = DateTo
+    id.IncomeReceived = LMF
+    id.Refresh
+    For Each idi In id.IncomeDistributionItems
+      FoundRow = dt.Select("AccountId = '" &amp; idi.AccountId &amp; "'")
+      If FoundRow.GetUpperBound(0) &lt;&gt; -1 Then
+        FoundRow(0)("dLMF") = idi.Distribution
+        TotalLMF += idi.Distribution
+      End If
+    Next
+    Interest -= TotalLMF
+    VarInterest = Interest
+    id.IncomeReceived = Interest
+    id.Refresh
+    For Each idi In id.IncomeDistributionItems
+      FoundRow = dt.Select("AccountId = '" &amp; idi.AccountId &amp; "'")
+      If FoundRow.GetUpperBound(0) &lt;&gt; -1 Then
+        FoundRow(0)("dInterest") = idi.Distribution
+        VarInterest -= idi.Distribution
+      End If
+    Next
+  End If
+End If
+
+row = dt.NewRow
+row("AccountId") = "T"
+row("Name") = "Totals"
+row("dPrincipal") = Principal - VarPrincipal
+row("dInterest") = Interest - VarInterest
+row("dLMF") = TotalLMF
+dt.Rows.Add(Row)
+row = dt.NewRow
+row("AccountId") = "V"
+row("Name") = "Variance"
+row("dPrincipal") = VarPrincipal
+row("dInterest") = VarInterest
+dt.Rows.Add(Row)
+
+                                    
+Return dt
+
+End Function</Code><Language>VisualBasic</Language><Notes /><PermissionKeyExecute /><RunWithoutPrompts>false</RunWithoutPrompts><TemplateText /><TemplateTextBookmarks /><TimeoutSeconds>60</TimeoutSeconds><ParametersType>None</ParametersType></finScript>
